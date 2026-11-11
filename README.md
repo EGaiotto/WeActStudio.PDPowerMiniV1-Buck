@@ -1,4 +1,6 @@
 * [中文版本](./README_zh.md)
+> **This fork adds [PDPower Studio](Tools/PDPowerStudio/README.md)** — a Windows control app with live charts, automation, an MCP server for AI agents and an English / Português / 简体中文 interface. Built on WeAct Studio's published communication protocol — thank you, WeAct!
+
 # WeActStudio.PDPowerMiniV1-Buck
 ![display](Images/en/1.png)
 

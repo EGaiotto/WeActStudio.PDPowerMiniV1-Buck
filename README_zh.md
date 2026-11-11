@@ -1,4 +1,6 @@
 * [English version](./README.md)
+> **本 fork 新增 [PDPower Studio](Tools/PDPowerStudio/README_zh-CN.md)**——Windows 上位机，支持实时曲线、自动化、AI 智能体 MCP 服务器，以及简体中文 / English / Português 界面。基于 WeAct Studio 公开的通信协议开发——感谢 WeAct！
+
 # WeActStudio.PDPowerMiniV1-Buck
 ![display](Images/zh/1.png)
 

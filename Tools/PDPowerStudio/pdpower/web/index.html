@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDPower Studio</title>
+<link rel="stylesheet" href="/static/vendor/uPlot.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230b0f17'/><path d='M18 3 7 18h8l-2 11 12-16h-8z' fill='%2338bdf8'/></svg>">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" class="logo"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs><path d="M18 2 6 18h8.5L12 30l13-17h-8.5z" fill="url(#lg)"/></svg>
+    <div><b>PDPower</b> Studio<small id="devName">WeAct PDPowerMini</small></div>
+  </div>
+  <div class="conn">
+    <select id="selPort" title="Porta serial"></select>
+    <select id="selLink" title="Interface">
+      <option value="usb">USB</option>
+      <option value="uart">UART (CRC8)</option>
+    </select>
+    <select id="selBaud" title="Baud UART" hidden>
+      <option>9600</option><option>19200</option><option>38400</option><option>57600</option>
+      <option selected>115200</option><option>230400</option><option>460800</option>
+    </select>
+    <button id="btnPorts" class="icon" title="Atualizar portas">⟳</button>
+    <button id="btnConnect" class="primary">Conectar</button>
+  </div>
+  <div class="chips" id="chips"></div>
+  <select id="selLang" class="lang" title="Idioma" data-noi18n></select>
+</header>
+
+<nav class="tabs">
+  <button data-tab="dash" class="active">Painel</button>
+  <button data-tab="auto">Automação</button>
+  <button data-tab="adv">Avançado</button>
+  <button data-tab="cfg">Configuração</button>
+  <div class="tabs-right">
+    <span id="autoBadge" class="autobadge" hidden></span>
+    <button id="btnEStop" class="estop" title="Para automação e desliga a saída (Esc)">■ PARAR TUDO</button>
+  </div>
+</nav>
+
+<main>
+<!-- ============================================================ PAINEL -->
+<section id="tab-dash" class="tab active">
+  <div class="dash">
+    <aside class="col-left">
+      <div class="card out-card">
+        <button id="btnPower" class="power" title="Liga/desliga a saída (Espaço)">
+          <svg viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.8a8 8 0 1 0 11.4 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="out-info">
+          <div class="lbl">SAÍDA</div>
+          <div id="outState" class="out-state">—</div>
+          <div id="modeBadge" class="mode">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Ajuste <span class="sub" id="activePresetLbl">M0</span></h3>
+        <div class="setrow v">
+          <label>Tensão</label>
+          <button class="step" data-k="v" data-d="-1">−</button>
+          <input id="inV" type="number" step="0.01" inputmode="decimal">
+          <span class="unit">V</span>
+          <button class="step" data-k="v" data-d="1">+</button>
+        </div>
+        <input id="rgV" class="range v" type="range" min="0.5" max="20" step="0.01">
+        <div class="setrow i">
+          <label>Corrente</label>
+          <button class="step" data-k="i" data-d="-1">−</button>
+          <input id="inI" type="number" step="0.001" inputmode="decimal">
+          <span class="unit">A</span>
+          <button class="step" data-k="i" data-d="1">+</button>
+        </div>
+        <input id="rgI" class="range i" type="range" min="0.005" max="3" step="0.005">
+        <div class="row gap">
+          <label class="mini">Passo
+            <select id="selStep"><option value="0">fino (10 mV / 1 mA)</option><option value="1" selected>médio (0,1 V / 10 mA)</option><option value="2">grosso (1 V / 100 mA)</option></select>
+          </label>
+          <button id="btnApply" class="primary grow">Aplicar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Presets <span class="sub">clique para ativar • ✎ editar</span></h3>
+        <div id="presets" class="presets"></div>
+      </div>
+
+      <div class="card">
+        <h3>Proteção e saída</h3>
+        <label class="toggle"><input type="checkbox" id="tgOcp"><span></span>OCP — desliga em sobrecorrente (~200 ms)</label>
+        <label class="toggle"><input type="checkbox" id="tgDis"><span></span>Descarga ativa na saída <em id="disNote" class="muted">(não lido)</em></label>
+        <label class="toggle"><input type="checkbox" id="tgCal"><span></span>Usar calibração de fábrica</label>
+        <div class="setrow2"><label>Brilho do display</label><input id="rgBright" type="range" min="0" max="100"><b id="lblBright">–</b></div>
+      </div>
+
+      <div class="card" id="pdCard">
+        <h3>Entrada USB-PD</h3>
+        <div class="kv"><span>Tipo</span><b id="inType">–</b></div>
+        <div class="kv"><span>Tensão de entrada</span><b id="inVolt">–</b></div>
+        <div class="setrow2"><label>Pedir ao carregador</label>
+          <input id="inPd" type="number" min="8" max="24" step="0.1" class="small"><span class="unit">V</span>
+          <button id="btnPd">Aplicar</button></div>
+        <p class="hint">Só tem efeito com a saída desligada.</p>
+      </div>
+
+      <div class="card">
+        <h3>Sistema</h3>
+        <div class="btngrid">
+          <button id="btnSave" title="Grava preset ativo, presets, OCP, calibração, brilho e tensão PD na flash">💾 Salvar na flash</button>
+          <button id="btnRefresh">⟳ Reler tudo</button>
+          <button id="btnReset" class="warn">↻ Reiniciar</button>
+          <button id="btnFactory" class="danger">⚠ Padrão de fábrica</button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="col-main">
+      <div class="readouts">
+        <div class="ro v"><div class="ro-lbl">TENSÃO</div><div class="ro-val"><span id="roV">0.000</span><small>V</small></div>
+          <div class="bar"><i id="barV"></i></div><div class="ro-sub" id="roVs">ajuste –</div></div>
+        <div class="ro i"><div class="ro-lbl">CORRENTE</div><div class="ro-val"><span id="roI">0.000</span><small>A</small></div>
+          <div class="bar"><i id="barI"></i></div><div class="ro-sub" id="roIs">limite –</div></div>
+        <div class="ro p"><div class="ro-lbl">POTÊNCIA</div><div class="ro-val"><span id="roP">0.000</span><small>W</small></div>
+          <div class="bar"><i id="barP"></i></div><div class="ro-sub" id="roPs">máx –</div></div>
+      </div>
+      <div class="minis">
+        <div><span>Energia</span><b id="mWh">0.000 Wh</b></div>
+        <div><span>Carga</span><b id="mAh">0.0 mAh</b></div>
+        <div><span>Tempo ligado</span><b id="mTon">00:00:00</b></div>
+        <div><span>Carga (R)</span><b id="mR">–</b></div>
+        <div class="mini-btn"><button id="btnCountersReset" class="ghost" title="Zerar contadores">zerar</button></div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="chart-tools">
+          <div class="seg" id="segWin">
+            <button data-w="30">30 s</button><button data-w="60" class="active">1 min</button><button data-w="300">5 min</button>
+            <button data-w="900">15 min</button><button data-w="3600">1 h</button><button data-w="0">Tudo</button>
+          </div>
+          <div class="seg" id="segSeries">
+            <button data-s="1" class="active v">V</button><button data-s="2" class="active i">A</button><button data-s="3" class="p">W</button>
+          </div>
+          <div class="grow"></div>
+          <button id="btnPause" class="ghost">⏸ Pausar</button>
+          <button id="btnMark" class="ghost">⚑ Marcar</button>
+          <button id="btnRec" class="ghost">● Gravar CSV</button>
+          <button id="btnExport" class="ghost">⤓ Exportar</button>
+          <button id="btnClear" class="ghost">Limpar</button>
+        </div>
+        <div id="chart" class="chart"></div>
+        <div class="statsbar" id="statsbar"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ AUTOMAÇÃO -->
+<section id="tab-auto" class="tab">
+  <div class="auto">
+    <div class="auto-left">
+      <div class="card">
+        <h3>Modelos</h3>
+        <div id="tplList" class="tpl-list"></div>
+      </div>
+      <div class="card" id="tplForm" hidden>
+        <h3 id="tplTitle"></h3>
+        <p class="hint" id="tplDesc"></p>
+        <div id="tplFields" class="fields"></div>
+        <button id="btnTplGen" class="primary wide">Gerar sequência →</button>
+      </div>
+      <div class="card">
+        <h3>Sequências salvas</h3>
+        <div class="row gap"><select id="selSeq" class="grow"></select><button id="btnSeqLoad">Abrir</button><button id="btnSeqDel" class="ghost" title="Excluir">🗑</button></div>
+      </div>
+    </div>
+
+    <div class="auto-mid">
+      <div class="card grow-card">
+        <div class="row gap"><h3 class="grow">Sequência (JSON)</h3>
+          <button id="btnSeqHelp" class="ghost">? referência</button>
+          <button id="btnSeqSave" class="ghost">Salvar como…</button>
+          <button id="btnSeqValidate" class="ghost">Validar</button>
+        </div>
+        <textarea id="seqEditor" spellcheck="false"></textarea>
+        <div class="run-row">
+          <button id="btnRun" class="primary">▶ Executar</button>
+          <button id="btnStop" class="danger">■ Parar</button>
+          <div class="progress grow"><i id="progBar"></i><span id="progTxt">Parado</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row gap"><h3 class="grow">Guardas globais (watchdog de software)</h3>
+          <label class="toggle inline"><input type="checkbox" id="tgGuards"><span></span>ativas</label></div>
+        <p class="hint">Avaliadas a cada 100 ms com a saída ligada; se a condição for verdadeira, a saída é desligada. Variáveis: v, i, p, vset, iset, cv, cc, oc, t_on, wh, mah, vin.</p>
+        <div id="guardList"></div>
+        <div class="row gap"><button id="btnGuardAdd" class="ghost">+ Adicionar</button><div class="grow"></div><button id="btnGuardSave" class="primary">Salvar guardas</button></div>
+      </div>
+    </div>
+
+    <div class="auto-right">
+      <div class="card">
+        <div class="row gap"><h3 class="grow">Resultado da varredura</h3>
+          <div class="seg small" id="segXY"><button data-x="set" class="active">X = ajuste</button><button data-x="v">X = V medida</button></div>
+          <button id="btnSweepCsv" class="ghost">CSV</button></div>
+        <div id="xyChart" class="xychart"></div>
+        <div id="measTable" class="meas"></div>
+      </div>
+      <div class="card grow-card">
+        <h3>Eventos</h3>
+        <div id="logBox" class="logbox"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ AVANÇADO -->
+<section id="tab-adv" class="tab">
+  <div class="adv">
+    <div class="card">
+      <div class="row gap"><h3 class="grow">Tabela de calibração de fábrica</h3>
+        <button id="btnFdRead">Ler</button><button id="btnFdExport" class="ghost">Exportar JSON</button>
+        <label class="btn ghost">Importar JSON<input type="file" id="fdFile" accept=".json" hidden></label>
+        <button id="btnFdWrite" class="danger">Gravar no dispositivo…</button></div>
+      <p class="hint" data-i18n="fdHint">Pares <b>exibido</b> (d) × <b>ajuste</b> (s) em mV / mA usados pelo firmware para corrigir leitura e saída. Um backup é salvo automaticamente antes de qualquer gravação.</p>
+      <div class="fd-wrap"><table id="fdTable" class="fd"></table></div>
+    </div>
+    <div class="adv-col">
+      <div class="card">
+        <h3>Painel LCD</h3>
+        <div class="kv"><span>Tipo atual</span><b id="lcdCur">–</b></div>
+        <div class="row gap"><select id="selLcd"><option value="0">0 — HAN</option><option value="1">1 — BOE</option></select>
+          <button id="btnLcd" class="danger">Gravar (não volátil)</button></div>
+        <p class="hint">Só altere se o display ficar com cores/orientação erradas após troca de tela.</p>
+      </div>
+      <div class="card">
+        <h3>Console do protocolo</h3>
+        <div class="quick" id="quickCmds"></div>
+        <div class="row gap"><input id="rawHex" class="grow mono" placeholder="ex.: 84 02  (terminador/CRC é adicionado)">
+          <label class="toggle inline"><input type="checkbox" id="rawTerm" checked><span></span>auto 0x0A/CRC</label>
+          <button id="btnRaw" class="primary">Enviar</button></div>
+        <div id="rawLog" class="logbox mono small"></div>
+      </div>
+    </div>
+    <div class="card span2">
+      <h3>Referência dos comandos</h3>
+      <div class="fd-wrap"><table class="ref" id="refTable"></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ CONFIG -->
+<section id="tab-cfg" class="tab">
+  <div class="cfg">
+    <div class="card">
+      <h3>Limites de software</h3>
+      <p class="hint">Valem para a interface, as automações e o MCP. Deixe vazio para usar o limite do modelo. O MCP não consegue alterar estes limites.</p>
+      <div class="setrow2"><label>Tensão máxima</label><input id="limV" type="number" step="0.1" class="small"><span class="unit">V</span><em id="limVm" class="muted"></em></div>
+      <div class="setrow2"><label>Corrente máxima</label><input id="limI" type="number" step="0.01" class="small"><span class="unit">A</span><em id="limIm" class="muted"></em></div>
+      <button id="btnLimSave" class="primary">Salvar limites</button>
+    </div>
+    <div class="card">
+      <h3>Aquisição</h3>
+      <div class="setrow2"><label>Intervalo de leitura</label><input id="pollMs" type="number" min="50" max="2000" step="10" class="small"><span class="unit">ms</span></div>
+      <label class="toggle"><input type="checkbox" id="tgAutoConn"><span></span>Conectar automaticamente ao abrir</label>
+      <div class="kv"><span>Pasta de configuração</span><code id="pathCfg"></code></div>
+      <div class="kv"><span>Logs CSV</span><code id="pathLogs"></code></div>
+      <button id="btnAcqSave" class="primary">Salvar</button>
+    </div>
+    <div class="card">
+      <h3>MCP (controle por agentes de IA)</h3>
+      <div class="kv"><span>Endpoint</span><code id="mcpUrl"></code></div>
+      <label class="toggle"><input type="checkbox" id="tgMcpWrite"><span></span>Permitir que o MCP altere a fonte</label>
+      <p class="hint">Para adicionar ao Claude Code:</p>
+      <pre class="code" id="mcpCmd"></pre>
+      <button id="btnMcpCopy" class="ghost">Copiar comando</button>
+    </div>
+    <div class="card">
+      <h3>Simulador</h3>
+      <p class="hint">Dispositivo virtual com carga resistiva de 10 Ω — útil para testar sequências sem hardware.</p>
+      <button id="btnSim">Conectar ao simulador</button>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="status">
+  <span class="dot" id="stDot"></span><span id="stTxt">Desconectado</span>
+  <span class="sep"></span><span id="stRate"></span>
+  <span class="sep"></span><span id="stCsv"></span>
+  <span class="grow"></span><span id="stLast" class="muted"></span>
+  <span class="sep"></span><span class="muted">MCP <code id="stMcp"></code></span>
+</footer>
+
+<div id="toasts"></div>
+<dialog id="dlg"><form method="dialog"><h3 id="dlgTitle"></h3><div id="dlgBody"></div>
+  <div class="row gap end"><button value="cancel" class="ghost">Cancelar</button><button value="ok" id="dlgOk" class="primary">OK</button></div></form></dialog>
+
+<script src="/static/vendor/uPlot.iife.min.js"></script>
+<script src="/api/lang.js"></script>
+<script src="/static/i18n.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
